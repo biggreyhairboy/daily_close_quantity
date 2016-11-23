@@ -6,7 +6,8 @@
 ###           生成价格序列，计算不同的品种的相关性
 ### input：    品种，开始日期，结束日期
 ### out：      价格序列的csv，相关性的matrix的csv
-
+### other:     用cmd运行脚本或启动wind的时候需要管理员权限启动
+### todo:      加强错误处理与提示部分
 from WindPy import *
 print w.start()
 from datetime import date
@@ -23,33 +24,37 @@ EXCH = ["CU", "AL", "ZN", "PB", "NI", "SN", "AU", "AG", "RB"]
 start_date = date(2015, 11,23)
 end_date = date(2016, 6, 21)
 
-
-# #get all trading days
-# #decide wheater it is a trading days
-#
-# #W9400055
-#by exchange
-#basic_metal = [CU, AL, ZN, PB, NI, SN]
-#precious_metal = [AU, AG]
-
-
 def daterange(start_date, end_date):
+    '''
+    :param start_date: 开始日期
+    :param end_date: 结束日期
+    :return: 日期形式
+    '''
     for n in range(int ((end_date - start_date).days) + 1):
         yield start_date + timedelta(n)
 
 def dropweekends(df):
+    '''
+    去除掉生成的datarame中包含周末数据的行
+    :param df: 原始的dataframe
+    :return: 修改后的dataframe
+    '''
     for dateindex, row in df.iterrows():
         if datetime.strptime(dateindex, '%Y-%m-%d').isoweekday() >= 6:
             df.drop(dateindex, inplace=True)
 
 def get_col_name(df, row):
+    '''
+    寻找当前列成交量做大的值所在对应的月份的column
+    :param df:
+    :param row:
+    :return:
+    '''
     b = (df.ix[row.name] == row['maxquantity'])
-    print b
+    # print b
     print "type of b is " + str(type(b))
-    print b.argmax()
-    return b.argmax()
-    # print b.index[b.argmax()]
-    # return b.index[b.argmax()]
+    # print b.argmax()
+    # return b.argmax()
 
 
 days_list = []
@@ -66,20 +71,10 @@ for product in EXCH:
 
     pricequantityframe = pd.DataFrame(index=days_list)
     quantityframe = pd.DataFrame(index=days_list)
+    #假设离当前月份的最活跃的月份是从今天往后数7个月内的某个合约
     for month_count in range(1, (end_date - start_date).days / 30 + 7):
         symbolname = product + (start_date + timedelta(days=month_count * 28)).strftime('%y%m') + exch
         result_data = w.wsd(symbolname, "close,volume", fmtstart_date, fmtend_date, "TradingCalendar=SHFE", "Days=AllDays")
-        #drop days if it is holiday
-        #need to maintain a chinese holiday table
-
-        # clost_pirce = []
-        # traded_volume = []
-        # clost_pirce.append(result_data.Data[0])
-        # traded_volume.append(result_data.Data[1])
-        # for c, v in clost_pirce, traded_volume:
-        #     if len(result_data.Data) == 1:
-        #         print "it's not a trading day"
-        #         continue
         price_series = Series(result_data.Data[0], index=pricequantityframe.index)
         quantity_series = Series(result_data.Data[1], index=pricequantityframe.index)
         pricequantityframe[symbolname + "_price"] = price_series
@@ -87,7 +82,8 @@ for product in EXCH:
         quantityframe[symbolname] = quantity_series
     dropweekends(pricequantityframe)
     dropweekends(quantityframe)
-    #pricequantityframe.to_csv(product + ".csv")
+    #分品种保存数据
+    pricequantityframe.to_csv(product + ".csv")
     tquantityframe = quantityframe.transpose()
     quantitymax = tquantityframe.max()
 
@@ -102,25 +98,11 @@ for product in EXCH:
         row = qdf.irow(r)
         print row.name
         thecolumn = get_col_name(quantityframe, row)
-        # pricequantityframe("theprice", index=[row.name]) = pricequantityframe(thecolumn + "_price", index=[row.name])
         pricequantityframe["theprice"][row.name] = pricequantityframe[thecolumn + "_price"][row.name]
-    # pricequantityframe.to_csv(product + "_theprice.csv")
-        # row["maxquantity"]
-    # qdf.apply(get_col_name, axis=1)
-    # for row in qdf.iterrows():
-    #     print row
-    #     print row['maxquantity']
-    #     # print row
-    #     # row
-    #     # if value == row["maxquantity"]:
-
-
-    # pricequantityframe.ix[]
-    # xxx = qdf.apply(get_col_name, axis = 1)
-    # print xxx
-    print "hold on"
-    print "hello list"
     productdataframe[product] = Series(pricequantityframe["theprice"], index=productdataframe.index)
+#保存所有数据
 productdataframe.to_csv("all_product.csv")
+#计算相关性矩阵，todo：不过是否需要换算法
 cor = productdataframe.corr()
+#保存相关性矩阵
 cor.to_csv("correlation.csv")
