@@ -37,6 +37,10 @@ for product in SHFE_EXCH:
     fmtstart_date = start_date.strftime("%Y-%m-%d")
     fmtend_date = end_date.strftime("%Y-%m-%d")
     result_data = []
+    days_list = []
+    for single_date in daterange(start_date, end_date):
+        days_list.append(single_date.strftime("%Y-%m-%d"))
+    priceframe = pd.DataFrame(index=days_list)
     for month_count in range(1, (end_date - start_date).days % 30 + 6):
         symbolname = product + (start_date + timedelta(days=month_count * 28)).strftime('%y%m') + exch
         result_data = w.wsd(symbolname, "close,volume", fmtstart_date, fmtend_date, "TradingCalendar=SHFE", "Days=AllDays")
@@ -48,15 +52,15 @@ for product in SHFE_EXCH:
         #     if len(result_data.Data) == 1:
         #         print "it's not a trading day"
         #         continue
-        days_list = []
 
-        for single_date in daterange(start_date, end_date):
-            days_list.append(single_date.strftime("%Y-%m-%d"))
-        price_list = {symbolname:result_data.Data[0]}
-        quantiy_list = {symbolname:result_data.Data[1]}
-        print len(price_list), len(quantiy_list), len(days_list)
-        aframe = DataFrame(price_list)
-        priceframe = DataFrame(price_list, columns=[symbolname], index=days_list)
-        quantiyframe = DataFrame(quantiy_list, columns=[symbolname], index=days_list)
+        #price_list = {symbolname: result_data.Data[0]}
+        price_series = Series(result_data.Data[0], index=priceframe.index)
+        #quantiy_list = {symbolname: result_data.Data[1]}
+        # aframe = DataFrame(price_list)
+        #df01 = pd.DataFrame(price_list, columns=[symbolname], index=days_list)
+        priceframe[symbolname] = price_series
+        #priceframe = DataFrame(price_list, columns=[symbolname], index=days_list)
+        #quantiyframe = DataFrame(quantiy_list, columns=[symbolname], index=days_list)
+
     print "hold on"
     print "hello list"
