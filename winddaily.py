@@ -19,12 +19,12 @@ import numpy as np
 
 ###input
 ###
-EXCH = ["CU", "AL", "ZN"]
-# EXCH = ["CU", "AL", "ZN", "PB", "NI", "SN", "AU", "AG", "RB"]
+#EXCH = ["AU"]
+EXCH = ["CU", "AL", "ZN", "PB", "NI", "SN", "AU", "AG", "RB"]
 #DCE = ["M", "Y", "A", "P", "C", "CS", "JD", "L", "V", "PP", "J", "JM", "I"]
 #ZCE = ["SR", "CF", "ZC", "FG", "TA", "MA", "O", "RM", "SF", "SM"]
-start_date = date(2015, 11,23)
-end_date = date(2016, 6, 21)
+start_date = date(2016, 8,23)
+end_date = date(2016, 12, 21)
 
 def daterange(start_date, end_date):
     '''
@@ -62,7 +62,8 @@ def get_col_name(df, row):
 days_list = []
 for single_date in daterange(start_date, end_date):
     days_list.append(single_date.strftime("%Y-%m-%d"))
-productdataframe = pd.DataFrame(index=days_list)
+productdataframe = pd.DataFrame()
+percentage_change_dataframe = pd.DataFrame()
 
 for product in EXCH:
     print "start deal with product " + product
@@ -79,10 +80,15 @@ for product in EXCH:
         result_data = w.wsd(symbolname, "close,volume", fmtstart_date, fmtend_date, "TradingCalendar=SHFE", "Days=AllDays")
         price_series = Series(result_data.Data[0], index=pricequantityframe.index)
         quantity_series = Series(result_data.Data[1], index=pricequantityframe.index)
+        # if type(price_series[0]) == type(None):
+        #当从wind取到的价格为None的时候drop掉
+        if price_series[0] is None:
+            continue
         pricequantityframe[symbolname + "_price"] = price_series
-        percentage_change = price_series.pct_change(1)
+        # print price_series
+        percentage_change_series = price_series.pct_change(1)
+        pricequantityframe[symbolname + "_percentage_change"] = percentage_change_series
         pricequantityframe[symbolname + "_quantity"] = quantity_series
-
         quantityframe[symbolname] = quantity_series
     dropweekends(pricequantityframe)
     dropweekends(quantityframe)
@@ -95,16 +101,20 @@ for product in EXCH:
     pricequantityframe.to_csv(product + "strip.csv")
     qdf = pd.DataFrame(pricequantityframe["maxquantity"])
     pricequantityframe["theprice"] = np.nan
+    pricequantityframe["thepercentage_change"] = np.nan
     thepricelist = []
     for r in range(len(pricequantityframe.index)):
         row = qdf.irow(r)
         thecolumn = get_col_name(quantityframe, row)
         pricequantityframe["theprice"][row.name] = pricequantityframe[thecolumn + "_price"][row.name]
-    productdataframe[product] = Series(pricequantityframe["theprice"], index=productdataframe.index)
+        pricequantityframe["thepercentage_change"][row.name] = pricequantityframe[thecolumn + "_percentage_change"][row.name]
+    productdataframe[product] = Series(pricequantityframe["theprice"], index=pricequantityframe.index)
+    percentage_change_dataframe[product + "_percentage_change"] = Series(pricequantityframe["thepercentage_change"], index=pricequantityframe.index)
     print "finish deal with product " + product + "\r\n"
 #保存所有数据
 productdataframe.to_csv("all_product.csv")
+percentage_change_dataframe.to_csv("all_product_percentage_change.csv")
 #计算相关性矩阵，todo：不过是否需要换算法
-cor = productdataframe.corr()
+cor = percentage_change_dataframe.corr()
 #保存相关性矩阵
 cor.to_csv("correlation.csv")
