@@ -7,7 +7,8 @@
 ### input：    品种，开始日期，结束日期
 ### out：      价格序列的csv，相关性的matrix的csv
 ### other:     用cmd运行脚本或启动wind的时候需要管理员权限启动
-### todo:      加强错误处理与提示部分
+### environment:  使用了 numpy，pandas与wind的插件，跑之前需要安装
+### todo:      加强错误处理与提示部分或者把数据存入数据库
 from WindPy import *
 print w.start()
 from datetime import date
@@ -18,7 +19,8 @@ import numpy as np
 
 ###input
 ###
-EXCH = ["CU", "AL", "ZN", "PB", "NI", "SN", "AU", "AG", "RB"]
+EXCH = ["CU", "AL", "ZN"]
+# EXCH = ["CU", "AL", "ZN", "PB", "NI", "SN", "AU", "AG", "RB"]
 #DCE = ["M", "Y", "A", "P", "C", "CS", "JD", "L", "V", "PP", "J", "JM", "I"]
 #ZCE = ["SR", "CF", "ZC", "FG", "TA", "MA", "O", "RM", "SF", "SM"]
 start_date = date(2015, 11,23)
@@ -52,9 +54,9 @@ def get_col_name(df, row):
     '''
     b = (df.ix[row.name] == row['maxquantity'])
     # print b
-    print "type of b is " + str(type(b))
+    # print "type of b is " + str(type(b))
     # print b.argmax()
-    # return b.argmax()
+    return b.argmax()
 
 
 days_list = []
@@ -63,12 +65,12 @@ for single_date in daterange(start_date, end_date):
 productdataframe = pd.DataFrame(index=days_list)
 
 for product in EXCH:
+    print "start deal with product " + product
     exch = ".SHF"
     result_sheet = []
     fmtstart_date = start_date.strftime("%Y-%m-%d")
     fmtend_date = end_date.strftime("%Y-%m-%d")
     result_data = []
-
     pricequantityframe = pd.DataFrame(index=days_list)
     quantityframe = pd.DataFrame(index=days_list)
     #假设离当前月份的最活跃的月份是从今天往后数7个月内的某个合约
@@ -78,7 +80,9 @@ for product in EXCH:
         price_series = Series(result_data.Data[0], index=pricequantityframe.index)
         quantity_series = Series(result_data.Data[1], index=pricequantityframe.index)
         pricequantityframe[symbolname + "_price"] = price_series
+        percentage_change = price_series.pct_change(1)
         pricequantityframe[symbolname + "_quantity"] = quantity_series
+
         quantityframe[symbolname] = quantity_series
     dropweekends(pricequantityframe)
     dropweekends(quantityframe)
@@ -86,9 +90,7 @@ for product in EXCH:
     pricequantityframe.to_csv(product + ".csv")
     tquantityframe = quantityframe.transpose()
     quantitymax = tquantityframe.max()
-
     pricequantityframe["maxquantity"] = Series(quantitymax, index=pricequantityframe.index)
-
     pricequantityframe = pricequantityframe[np.isfinite(pricequantityframe['maxquantity'])]
     pricequantityframe.to_csv(product + "strip.csv")
     qdf = pd.DataFrame(pricequantityframe["maxquantity"])
@@ -96,10 +98,10 @@ for product in EXCH:
     thepricelist = []
     for r in range(len(pricequantityframe.index)):
         row = qdf.irow(r)
-        print row.name
         thecolumn = get_col_name(quantityframe, row)
         pricequantityframe["theprice"][row.name] = pricequantityframe[thecolumn + "_price"][row.name]
     productdataframe[product] = Series(pricequantityframe["theprice"], index=productdataframe.index)
+    print "finish deal with product " + product + "\r\n"
 #保存所有数据
 productdataframe.to_csv("all_product.csv")
 #计算相关性矩阵，todo：不过是否需要换算法
